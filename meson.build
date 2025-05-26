@@ -20,6 +20,7 @@ project(
 # === @begin: Meson modules imports ===
 fs = import('fs')
 py = import('python').find_installation(pure: false, modules: ['pybind11'])
+cmake = import('cmake')
 # === @end: Meson modules imports ===
 
 
@@ -191,14 +192,22 @@ install_subdir(
 # === @end: Python, pure ===
 
 
+# === @begin: CMake Configuration ===
+# IMPORTANT: we are not generated the `-targets.cmake` as it's not yet supported by `meson`
+# and we don't need it beecause our cudnn frontend is only used by torch, where we pass
+# `CUDNN_FRONTEND_INCLUDE_DIR=EUGO_STANDARD_PATH/include`.
+# Some minor consequences are that:
+# 1. `find_package(CUDNN_FRONTEND)` will work in cmake.
+# 2. But, it may not define the `targets` in the same way as upstream cmake version does which may potentially break builds of downstream packages who depend on this original behavior.
+# Similar to other features introduced to meson in the previous year, we expect meson to add native support for this, so we won't have to introduce it ourselves.
+cmake.configure_package_config_file(
+    name: 'cudnn_frontend',
+    input: 'cudnn_frontend-config.cmake.in',
+)
+
 # @HELP TODO+
 # 1. Try using cmake mode to find cuda and it portions to simplify our build and only use that we really need.
 #    1. Probably we don't need `cudart_static` even!
 # 2. Headers into /usr/local/include
 #    1. Probably put into `cudnn` package (and not into site-packages directly) and just expose via cmake-config file
-# 3. Generate CMake configuration files
-#    1. cmake.write_basic_package_version_file
-#    OR
-#    2. [more preferrably] cmake.<some function> -> and that Conors merged into upstream
-#    3. Review the changes in the pull request for further insights
-     1. https://github.com/NVIDIA/cudnn-frontend/pull/125/files#diff-f716df17f273769aad66b5665797f033f4ae752ee785e426203f02d41bed8147
+
