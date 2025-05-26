@@ -42,13 +42,14 @@ add_project_arguments(
 #
 # Actually, only `cudart` and headers are used from CUDAToolkit. All other components and libraries are ignored.
 # Moreover, this package doesn't involve any CUDA code compilation (i.e., .cu and .cuh files).
-cuda = dependency('cuda')
+# So instead of using meson's native cuda dependency version (i.e. `cuda = dependency('cuda')`), we use the `cmake` method to find the `cudart` library.
+cuda = dependency('CUDA', method: 'cmake', components: ['cudart'])
 
 # Find cudnn backend using their cmake file.
 # We created a symlink to `cuDNN.cmake` in the `cmake` directory to our custom `FindcuDNN.cmake` file (it's a naming convention forced by CMake)
 cudnn_backend = dependency('cuDNN', cmake_module_path: meson.project_source_root() / 'cmake')
 
-# Find our system installed `dlpack` using their cmake file and ...
+# Find our system installed `dlpack` using their cmake file and modules.
 dlpack = dependency('dlpack', method: 'cmake', modules: ['dlpack::dlpack'])
 
 # `CUDNN_FRONTEND_SKIP_JSON_LIB` is not needed because we always use system-provided version
@@ -174,8 +175,8 @@ py.extension_module(
     gnu_symbol_visibility: 'hidden',
 
     # This library is one of a few which requires direct interaction with the GPU driver, so we need to link this library explicitly.
-    # `meson` fails to find that in their `cuda` finder, so we do it here. Noteworthy, `libcuda.so` doesn't exist at buildtime, it only
-    # becomes inserted by NVIDIA driver runtime. At buildtime, we just have stubs library allowing to build but useless at runtime.
+    # `meson` fails to find that in their `cuda` finder, so we do it here. Noteworthy, `libcuda.so.1` doesn't exist at buildtime, it only
+    # becomes inserted by NVIDIA driver runtime. At buildtime, we just have stubs library (`libcuda.so`) allowing to build but useless at runtime.
     link_args: ['-lcuda']
 )
 # === @end: Python, compilable ===
@@ -186,23 +187,24 @@ install_subdir(
     'python/cudnn/',
     install_dir: py.get_install_dir(),
     install_tag: 'python-runtime',
-
     follow_symlinks: true,
 )
 # === @end: Python, pure ===
 
 
 # === @begin: CMake Configuration ===
-# IMPORTANT: we are not generated the `-targets.cmake` as it's not yet supported by `meson`
-# and we don't need it beecause our cudnn frontend is only used by torch, where we pass
+# IMPORTANT: we are not generating the `-targets.cmake` as it's not yet supported by `meson`
+# and we don't need it because our cudnn frontend is only used by torch, where we pass
 # `CUDNN_FRONTEND_INCLUDE_DIR=EUGO_STANDARD_PATH/include`.
 # Some minor consequences are that:
 # 1. `find_package(CUDNN_FRONTEND)` will work in cmake.
 # 2. But, it may not define the `targets` in the same way as upstream cmake version does which may potentially break builds of downstream packages who depend on this original behavior.
 # Similar to other features introduced to meson in the previous year, we expect meson to add native support for this, so we won't have to introduce it ourselves.
+# https://mesonbuild.com/CMake-module.html#cmakeconfigure_package_config_file
 cmake.configure_package_config_file(
-    name: 'cudnn_frontend',
+    name: 'cudnn_frontend', # This must be `cudnn_frontend` and not `cuda_cudnn_frontend` to match the upstream naming convention (and not our naming convention)
     input: 'cudnn_frontend-config.cmake.in',
+    configuration: configuration_data()
 )
 
 # @HELP TODO+
