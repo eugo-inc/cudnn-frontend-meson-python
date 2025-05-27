@@ -43,7 +43,8 @@ add_project_arguments(
 # Actually, only `cudart` and headers are used from CUDAToolkit. All other components and libraries are ignored.
 # Moreover, this package doesn't involve any CUDA code compilation (i.e., .cu and .cuh files).
 # So instead of using meson's native cuda dependency version (i.e. `cuda = dependency('cuda')`), we use the `cmake` method to find the `cudart` library.
-cuda = dependency('CUDA', method: 'cmake', components: ['cudart'])
+# We deliberately use `cudart` (dynamic version) and not `cudart_static` (and pass `static: false`) because we don't want to link against static version of the library.
+cuda = dependency('CUDA', method: 'cmake', components: ['cudart'], static: false)
 
 # Find cudnn backend using their cmake file.
 # We created a symlink to `cuDNN.cmake` in the `cmake` directory to our custom `FindcuDNN.cmake` file (it's a naming convention forced by CMake)
@@ -135,10 +136,15 @@ cudnn_frontend_native_header_files = files(
     'include/cudnn_frontend_Logging.h'
 )
 
-# @TODO+:1
-install_headers(
-    cudnn_frontend_native_header_files,
-    preserve_path: true
+# Pip doesn't allow you to install any file outside python managed prefixes, like `site-packages` or `dist-packages`.
+# So we install the headers into `site-packages/cudnn/include` directory.
+# To use them system-wide, we symlink them in our `setup` script.
+install_subdir(
+    'include',
+    install_dir: py.get_install_dir() / 'cudnn',
+    install_tag: 'python-runtime',
+    follow_symlinks: true,
+    exclude_directories: ['cudnn_frontend/thirdparty/nlohmann']
 )
 
 cudnn_frontend_native = include_directories('include')
@@ -194,22 +200,15 @@ install_subdir(
 
 # === @begin: CMake Configuration ===
 # IMPORTANT: we are not generating the `-targets.cmake` as it's not yet supported by `meson`
-# and we don't need it because our cudnn frontend is only used by torch, where we pass
-# `CUDNN_FRONTEND_INCLUDE_DIR=EUGO_STANDARD_PATH/include`.
+# and we don't need it because our cudnn frontend is only used by torch, where we pass `CUDNN_FRONTEND_INCLUDE_DIR=EUGO_STANDARD_PATH/include`.
 # Some minor consequences are that:
 # 1. `find_package(CUDNN_FRONTEND)` will work in cmake.
 # 2. But, it may not define the `targets` in the same way as upstream cmake version does which may potentially break builds of downstream packages who depend on this original behavior.
 # Similar to other features introduced to meson in the previous year, we expect meson to add native support for this, so we won't have to introduce it ourselves.
 # https://mesonbuild.com/CMake-module.html#cmakeconfigure_package_config_file
-cmake.configure_package_config_file(
-    name: 'cudnn_frontend', # This must be `cudnn_frontend` and not `cuda_cudnn_frontend` to match the upstream naming convention (and not our naming convention)
-    input: 'cudnn_frontend-config.cmake.in',
-    configuration: configuration_data()
-)
-
-# @HELP TODO+
-# 1. Try using cmake mode to find cuda and it portions to simplify our build and only use that we really need.
-#    1. Probably we don't need `cudart_static` even!
-# 2. Headers into /usr/local/include
-#    1. Probably put into `cudnn` package (and not into site-packages directly) and just expose via cmake-config file
-
+# cmake.configure_package_config_file(
+#     name: 'cudnn_frontend', # This must be `cudnn_frontend` and not `cuda_cudnn_frontend` to match the upstream naming convention (and not our naming convention)
+#     input: 'cudnn_frontend-config.cmake.in',
+#     configuration: configuration_data(),
+#     install_dir: py.get_install_dir() / 'cudnn' / 'cmake',
+# )
