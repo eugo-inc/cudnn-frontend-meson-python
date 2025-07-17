@@ -36,7 +36,7 @@
 #ifndef CUDNN_FRONTEND_SKIP_JSON_LIB
 
 #ifndef CUDNN_FRONTEND_SKIP_JSON_LIB
-#include "cudnn_frontend/thirdparty/nlohmann/json.hpp"
+#include <nlohmann/json.hpp> // @EUGO_CHANGE: Changed to use our system version of nlohmann
 #endif
 
 using json = nlohmann::json;
