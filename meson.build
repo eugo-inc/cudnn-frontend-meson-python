@@ -10,7 +10,7 @@ project(
     meson_version: '>=1.3.0',
     version: run_command([
         'sed', '-n',
-        's/^__version__\\s*=\\s*"\([^"]*\)"/\\1/p',
+        's/__version__\\s*=\\s*[\'"]\\([^\'\"]*\\)[\'\"]/\\1/p',,
         meson.project_source_root() / 'python' / 'cudnn' / '__init__.py'
     ], check: true).stdout().strip()
 )
