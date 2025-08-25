@@ -10,7 +10,7 @@ project(
     meson_version: '>=1.3.0',
     version: run_command([
         'sed', '-n',
-        's/__version__\\s*=\\s*[\'"]\\([^\'\"]*\\)[\'\"]/\\1/p',
+        's/^__version__\\s*=\\s*"\([^"]*\)"/\\1/p',
         meson.project_source_root() / 'python' / 'cudnn' / '__init__.py'
     ], check: true).stdout().strip()
 )
@@ -94,6 +94,7 @@ cudnn_frontend_native_header_files = files(
     'include/cudnn_frontend/backend/kernel_cache.h',
     'include/cudnn_frontend/backend/plan_helpers.h',
     'include/cudnn_frontend/backend/backend_descriptor.h',
+    'include/cudnn_frontend/backend/device_properties.h', # TODO+ slava this is new in the wheel so i added it here
     'include/cudnn_frontend/graph_properties.h',
     'include/cudnn_frontend/node/softmax.h',
     'include/cudnn_frontend/node/matmul.h',
@@ -112,7 +113,8 @@ cudnn_frontend_native_header_files = files(
     'include/cudnn_frontend/node/instancenorm.h',
     'include/cudnn_frontend/node/slice.h',
     'include/cudnn_frontend/node/sdpa_fp8_bwd.h',
-    'include/cudnn_frontend/node/sdpa_fp8.h',
+    # 'include/cudnn_frontend/node/sdpa_fp8.h', # TODO+ slava this was deleted and renamed to the below (need to sync latest upstream for this then comment this out)
+    'include/cudnn_frontend/node/sdpa_support_surface.h', # TODO+ slava this is new in the wheel so i added it here  (need to sync latest upstream for this then UNcomment this out)
     'include/cudnn_frontend/node/concatenate.h',
     'include/cudnn_frontend/node/matmul_fp8.h',
     'include/cudnn_frontend/node/rng.h',
@@ -133,7 +135,7 @@ cudnn_frontend_native_header_files = files(
     'include/cudnn_frontend_Errata.h',
     'include/cudnn_frontend_ExecutionPlan.h',
     'include/cudnn_frontend_ExecutionPlanCache.h',
-    'include/cudnn_frontend_Logging.h'
+    'include/cudnn_frontend_Logging.h',
 )
 
 # Pip doesn't allow you to install any file outside python managed prefixes, like `site-packages` or `dist-packages`.
@@ -144,7 +146,7 @@ install_subdir(
     install_dir: py.get_install_dir() / 'cudnn',
     install_tag: 'python-runtime',
     follow_symlinks: true,
-    exclude_directories: ['cudnn_frontend/thirdparty/nlohmann']
+    # exclude_directories: ['cudnn_frontend/thirdparty/nlohmann'] # TODO+ slava they are including these now but not sure if its a mistake on their part
 )
 
 cudnn_frontend_native = include_directories('include')
@@ -159,16 +161,16 @@ cudnn_frontend_native_dep = declare_dependency(
 py.extension_module(
     '_compiled_module',
     [
+        # python/
         'python/pycudnn.cpp',
         'python/properties.cpp',
 
-        'python/pygraph/pygraph.cpp',
+        # python/pygraph
         'python/pygraph/norm.cpp',
+        'python/pygraph/pointwise.cpp',
+        'python/pygraph/pygraph.cpp',
         'python/pygraph/sdpa.cpp',
-        'python/pygraph/pointwise.cpp'
     ],
-    install: true,
-    subdir: 'cudnn/',
     dependencies: [
         cuda,
         cudnn_backend,
@@ -183,7 +185,9 @@ py.extension_module(
     # This library is one of a few which requires direct interaction with the GPU driver, so we need to link this library explicitly.
     # `meson` fails to find that in their `cuda` finder, so we do it here. Noteworthy, `libcuda.so.1` doesn't exist at buildtime, it only
     # becomes inserted by NVIDIA driver runtime. At buildtime, we just have stubs library (`libcuda.so`) allowing to build but useless at runtime.
-    link_args: ['-lcuda']
+    link_args: ['-lcuda'],
+    install: true,
+    subdir: 'cudnn/cudnn/',
 )
 # === @end: Python, compilable ===
 
@@ -191,7 +195,8 @@ py.extension_module(
 # === @begin: Python, pure ===
 install_subdir(
     'python/cudnn/',
-    install_dir: py.get_install_dir(),
+
+    install_dir: py.get_install_dir() / 'cudnn',
     install_tag: 'python-runtime',
     follow_symlinks: true,
 )
