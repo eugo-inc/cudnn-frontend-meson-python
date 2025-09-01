@@ -1,0 +1,26 @@
+[build-system]
+build-backend = 'mesonpy'
+
+requires = [
+    'meson_python>=0.17.1',
+    'meson>=1.8.0',
+    'cmake>=3.18',
+    'pybind11[global]>=0.1.35'
+]
+
+[project]
+name = "cuda-cudnn-frontend"
+dynamic = ["version"]
+description = "CUDNN FrontEnd python library"
+readme = "README.md"
+authors = [
+    {name = "Eugo, Inc."},
+    {name = "NVIDIA, Ltd."}
+]
+requires-python = ">=3.12"
+license = {text = "NVIDIA Proprietary Software"}
+
+
+[project.urls]
+"Homepage" = "https://github.com/eugo-inc/cudnn-frontend-meson-python"
+"Bug Tracker" = "https://github.com/eugo-inc/cudnn-frontend-meson-python/issues"
