@@ -29,15 +29,9 @@ class CMakeBuild(build_ext):
         cfg = "Debug" if debug else "Release"
 
         is_windows = os.name == "nt"
-        # Set Python_EXECUTABLE instead if you use PYBIND11_FINDPYTHON
-        cmake_args = []
-
-        if is_windows == False:
-            cmake_args += [
-                f"-DPython_EXECUTABLE={sys.executable}",
-            ]
-
         cmake_args = [
+            f"-DPython_EXECUTABLE={sys.executable}",
+            f"-DPYBIND11_FINDPYTHON=ON",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
             f"-DCUDNN_FRONTEND_BUILD_PYTHON_BINDINGS=ON",
             # There's no need to build cpp samples and tests with python
@@ -64,6 +58,9 @@ class CMakeBuild(build_ext):
 
         if "CUDNN_PATH" in os.environ:
             cmake_args.append(f"-DCUDNN_PATH={os.environ['CUDNN_PATH']}")
+
+        if "FETCHCONTENT_SOURCE_DIR_DLPACK" in os.environ:
+            cmake_args.append(f"-DFETCHCONTENT_SOURCE_DIR_DLPACK={os.environ['FETCHCONTENT_SOURCE_DIR_DLPACK']}")
 
         # Using Ninja-build since it a) is available as a wheel and b)
         # multithreads automatically. MSVC would require all variables be
@@ -99,15 +96,11 @@ class CMakeBuild(build_ext):
             build_temp.mkdir(parents=True)
 
         print(" ".join(cmake_args))
-        subprocess.run(
-            ["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True
-        )
-        subprocess.run(
-            ["cmake", "--build", ".", *build_args], cwd=build_temp, check=True
-        )
+        subprocess.run(["cmake", ext.sourcedir, *cmake_args], cwd=build_temp, check=True)
+        subprocess.run(["cmake", "--build", ".", *build_args], cwd=build_temp, check=True)
 
 
 setup(
-    ext_modules=[CMakeExtension("cudnn/_compiled_module")],
+    ext_modules=[CMakeExtension("cudnn._compiled_module")],
     cmdclass={"build_ext": CMakeBuild},
 )

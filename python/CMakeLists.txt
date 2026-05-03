@@ -17,10 +17,15 @@ IF(CUDNN_FRONTEND_USE_SYSTEM_DLPACK)
     message(FATAL_ERROR "dlpack not found")
   endif()
 else()
+
+  # Read dlpack version from dlpack_version.txt
+  file(READ ${PROJECT_SOURCE_DIR}/dlpack_version.txt DLPACK_VERSION)
+  string(STRIP "${DLPACK_VERSION}" DLPACK_VERSION)
+
   FetchContent_Declare(
     dlpack
     GIT_REPOSITORY https://github.com/dmlc/dlpack
-    GIT_TAG        v1.1
+    GIT_TAG        v${DLPACK_VERSION}
   )
   FetchContent_MakeAvailable(dlpack)
 endif()
@@ -32,6 +37,7 @@ find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 include(${PROJECT_SOURCE_DIR}/cmake/cuDNN.cmake)
 
 option(CUDNN_FRONTEND_FETCH_PYBINDS_IN_CMAKE "Whether cmake build system should fetch pybinds." ON)
+set(PYBIND11_FINDPYTHON ON)
 
 
 if(CUDNN_FRONTEND_FETCH_PYBINDS_IN_CMAKE)

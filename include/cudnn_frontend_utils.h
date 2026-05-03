@@ -96,21 +96,21 @@ struct nlohmann::adl_serializer<nv_bfloat16> {
 };
 
 template <>
-struct nlohmann::adl_serializer<std::variant<int64_t, int32_t, half, float, nv_bfloat16>> {
+struct nlohmann::adl_serializer<std::variant<int64_t, int32_t, half, float, double, nv_bfloat16>> {
     static void
-    to_json(nlohmann::json& j, const std::variant<int64_t, int32_t, half, float, nv_bfloat16>& data) {
+    to_json(nlohmann::json& j, const std::variant<int64_t, int32_t, half, float, double, nv_bfloat16>& data) {
         std::visit([&](const auto& v) { j = {{"index", data.index()}, {"value", v}}; }, data);
     }
 
     static void
-    from_json(const nlohmann::json& j, std::variant<int64_t, int32_t, half, float, nv_bfloat16>& data) {
+    from_json(const nlohmann::json& j, std::variant<int64_t, int32_t, half, float, double, nv_bfloat16>& data) {
         if (!j.is_object() || !j.contains("index") || !j.contains("value")) {
             return;
         }
 
         size_t type_index = j.at("index").get<size_t>();
         if (type_index == 0) {
-            data = j.at("value").get<int32_t>();
+            data = j.at("value").get<int64_t>();
         } else if (type_index == 1) {
             data = j.at("value").get<int32_t>();
         } else if (type_index == 2) {
@@ -118,6 +118,8 @@ struct nlohmann::adl_serializer<std::variant<int64_t, int32_t, half, float, nv_b
         } else if (type_index == 3) {
             data = j.at("value").get<float>();
         } else if (type_index == 4) {
+            data = j.at("value").get<double>();
+        } else if (type_index == 5) {
             data = j.at("value").get<nv_bfloat16>();
         } else {
             return;
@@ -261,6 +263,10 @@ to_string(cudnnBackendBehaviorNote_t note) {
         case CUDNN_BEHAVIOR_NOTE_SUPPORTS_CUDA_GRAPH_NATIVE_API:
             return std::string("CUDNN_BEHAVIOR_NOTE_SUPPORTS_CUDA_GRAPH_NATIVE_API");
 #endif
+#if (CUDNN_VERSION >= 91500)
+        case CUDNN_BEHAVIOR_NOTE_CUBLASLT_DEPENDENCY:
+            return std::string("CUDNN_BEHAVIOR_NOTE_CUBLASLT_DEPENDENCY");
+#endif
 #ifndef NO_DEFAULT_IN_SWITCH
         default:
             return std::string("UNKNOWN_BEHAVIOR_NOTE");
@@ -382,6 +388,20 @@ enum class PaddingMode_t {
     ZERO_PAD
 };
 
+enum class ReshapeMode_t {
+    NOT_SET,
+
+    VIEW_ONLY,
+    LOGICAL
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(ReshapeMode_t,
+                             {
+                                 {ReshapeMode_t::NOT_SET, nullptr},
+                                 {ReshapeMode_t::VIEW_ONLY, "VIEW_ONLY"},
+                                 {ReshapeMode_t::LOGICAL, "LOGICAL"},
+                             })
+
 enum class ConvolutionMode_t {
     NOT_SET,
 
@@ -415,6 +435,22 @@ NLOHMANN_JSON_SERIALIZE_ENUM(NormFwdPhase_t,
                                  {NormFwdPhase_t::NOT_SET, nullptr},
                                  {NormFwdPhase_t::INFERENCE, "INFERENCE"},
                                  {NormFwdPhase_t::TRAINING, "TRAINING"},
+                             })
+
+enum class MoeGroupedMatmulMode_t {
+    NOT_SET,
+
+    NONE,
+    GATHER,
+    SCATTER
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(MoeGroupedMatmulMode_t,
+                             {
+                                 {MoeGroupedMatmulMode_t::NOT_SET, nullptr},
+                                 {MoeGroupedMatmulMode_t::NONE, "NONE"},
+                                 {MoeGroupedMatmulMode_t::GATHER, "GATHER"},
+                                 {MoeGroupedMatmulMode_t::SCATTER, "SCATTER"},
                              })
 
 enum class DescriptorType_t {
@@ -457,7 +493,11 @@ enum class DescriptorType_t {
     OPERATION_PAGED_CACHE_LOAD_DESCRIPTOR,
     OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR,
     OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR,
-    OPERATION_CONCATENATE_DESCRIPTOR
+    OPERATION_CONCATENATE_DESCRIPTOR,
+    OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR,
+    OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR,
+    OPERATION_TRANSPOSE_DESCRIPTOR,
+    OPERATION_SLICE_DESCRIPTOR
 };
 
 enum class NormMode_t {
@@ -596,6 +636,7 @@ enum class HeurMode_t {
     A,
     B,
     FALLBACK,
+    OPENSOURCE,
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(HeurMode_t,
@@ -603,6 +644,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(HeurMode_t,
                                  {HeurMode_t::A, "A"},
                                  {HeurMode_t::B, "B"},
                                  {HeurMode_t::FALLBACK, "FALLBACK"},
+                                 {HeurMode_t::OPENSOURCE, "OPENSOURCE"},
                              })
 
 enum class BehaviorNote_t {
@@ -612,6 +654,7 @@ enum class BehaviorNote_t {
     REQUIRES_FILTER_INT8x32_REORDER,
     REQUIRES_BIAS_INT8x32_REORDER,
     SUPPORTS_CUDA_GRAPH_NATIVE_API,
+    CUBLASLT_DEPENDENCY,
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(BehaviorNote_t,
@@ -621,6 +664,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(BehaviorNote_t,
                                  {BehaviorNote_t::REQUIRES_FILTER_INT8x32_REORDER, "REQUIRES_FILTER_INT8x32_REORDER"},
                                  {BehaviorNote_t::REQUIRES_BIAS_INT8x32_REORDER, "REQUIRES_BIAS_INT8x32_REORDER"},
                                  {BehaviorNote_t::SUPPORTS_CUDA_GRAPH_NATIVE_API, "SUPPORTS_CUDA_GRAPH_NATIVE_API"},
+                                 {BehaviorNote_t::CUBLASLT_DEPENDENCY, "CUBLASLT_DEPENDENCY"},
                              })
 
 enum class NumericalNote_t {
@@ -674,22 +718,35 @@ enum class DataType_t {
     FP8_E8M0,
     FP4_E2M1,
     INT4,
+    COMPLEX_FP32,
+    COMPLEX_FP64,
 };
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    DataType_t,
-    {
-        {DataType_t::NOT_SET, nullptr},     {DataType_t::FLOAT, "FLOAT"},
-        {DataType_t::DOUBLE, "DOUBLE"},     {DataType_t::HALF, "HALF"},
-        {DataType_t::INT8, "INT8"},         {DataType_t::INT32, "INT32"},
-        {DataType_t::INT8x4, "INT8x4"},     {DataType_t::UINT8, "UINT8"},
-        {DataType_t::UINT8x4, "UINT8x4"},   {DataType_t::INT8x32, "INT8x32"},
-        {DataType_t::BFLOAT16, "BFLOAT16"}, {DataType_t::INT64, "INT64"},
-        {DataType_t::BOOLEAN, "BOOLEAN"},   {DataType_t::FP8_E4M3, "FP8_E4M3"},
-        {DataType_t::FP8_E5M2, "FP8_E5M2"}, {DataType_t::FAST_FLOAT_FOR_FP8, "FAST_FLOAT_FOR_FP8"},
-        {DataType_t::FP8_E8M0, "FP8_E8M0"}, {DataType_t::FP4_E2M1, "FP4_E2M1"},
-        {DataType_t::INT4, "INT4"},
-    })
+NLOHMANN_JSON_SERIALIZE_ENUM(DataType_t,
+                             {
+                                 {DataType_t::NOT_SET, nullptr},
+                                 {DataType_t::FLOAT, "FLOAT"},
+                                 {DataType_t::DOUBLE, "DOUBLE"},
+                                 {DataType_t::HALF, "HALF"},
+                                 {DataType_t::INT8, "INT8"},
+                                 {DataType_t::INT32, "INT32"},
+                                 {DataType_t::INT8x4, "INT8x4"},
+                                 {DataType_t::UINT8, "UINT8"},
+                                 {DataType_t::UINT8x4, "UINT8x4"},
+                                 {DataType_t::INT8x32, "INT8x32"},
+                                 {DataType_t::BFLOAT16, "BFLOAT16"},
+                                 {DataType_t::INT64, "INT64"},
+                                 {DataType_t::BOOLEAN, "BOOLEAN"},
+                                 {DataType_t::FP8_E4M3, "FP8_E4M3"},
+                                 {DataType_t::FP8_E5M2, "FP8_E5M2"},
+                                 {DataType_t::FAST_FLOAT_FOR_FP8, "FAST_FLOAT_FOR_FP8"},
+                                 {DataType_t::FP8_E8M0, "FP8_E8M0"},
+                                 {DataType_t::FP4_E2M1, "FP4_E2M1"},
+                                 {DataType_t::INT4, "INT4"},
+                                 {DataType_t::COMPLEX_FP32, "COMPLEX_FP32"},
+                                 {DataType_t::COMPLEX_FP64, "COMPLEX_FP64"},
+
+                             })
 
 enum class ReductionMode_t {
     NOT_SET,
@@ -917,6 +974,18 @@ operator<<(std::ostream& os, const DescriptorType_t& mode) {
         case DescriptorType_t::OPERATION_CONCATENATE_DESCRIPTOR:
             os << "OPERATION_CONCATENATE_DESCRIPTOR";
             break;
+        case DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR:
+            os << "OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR";
+            break;
+        case DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR:
+            os << "OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR";
+            break;
+        case DescriptorType_t::OPERATION_TRANSPOSE_DESCRIPTOR:
+            os << "OPERATION_TRANSPOSE_DESCRIPTOR";
+            break;
+        case DescriptorType_t::OPERATION_SLICE_DESCRIPTOR:
+            os << "OPERATION_SLICE_DESCRIPTOR";
+            break;
         case DescriptorType_t::NOT_SET:
             os << "NOT_SET";
             break;
@@ -1066,7 +1135,7 @@ convert_to_cudnn_type(cudnn_frontend::DataType_t const mode, cudnnDataType_t& cu
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
 #endif
         case DataType_t::FP8_E8M0:
-#if (CUDNN_VERSION >= 90700)  // TODO: v9.99 is new feature branch; switch to release branch when ready
+#if (CUDNN_VERSION >= 90700)
             NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(90700, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
             cudnn_mode = CUDNN_DATA_FP8_E8M0;
             return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
@@ -1074,7 +1143,7 @@ convert_to_cudnn_type(cudnn_frontend::DataType_t const mode, cudnnDataType_t& cu
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
 #endif
         case DataType_t::FP4_E2M1:
-#if (CUDNN_VERSION >= 90700)  // TODO: v9.99 is new feature branch; switch to release branch when ready
+#if (CUDNN_VERSION >= 90700)
             NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(90700, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
             cudnn_mode = CUDNN_DATA_FP4_E2M1;
             return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
@@ -1089,7 +1158,22 @@ convert_to_cudnn_type(cudnn_frontend::DataType_t const mode, cudnnDataType_t& cu
 #else
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
 #endif
-
+        case DataType_t::COMPLEX_FP32:
+#if (CUDNN_VERSION >= 91400)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(91400, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_DATA_COMPLEX_FP32;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+        case DataType_t::COMPLEX_FP64:
+#if (CUDNN_VERSION >= 91400)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(91400, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_DATA_COMPLEX_FP64;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
 #ifndef NO_DEFAULT_IN_SWITCH
         default:
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
@@ -1365,8 +1449,16 @@ convert_to_cudnn_type(cudnn_frontend::BehaviorNote_t const mode, cudnnBackendBeh
             return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
         case BehaviorNote_t::SUPPORTS_CUDA_GRAPH_NATIVE_API:
 #if (CUDNN_VERSION >= 90500)
-            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(90300, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(90500, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
             cudnn_mode = CUDNN_BEHAVIOR_NOTE_SUPPORTS_CUDA_GRAPH_NATIVE_API;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+        case BehaviorNote_t::CUBLASLT_DEPENDENCY:
+#if (CUDNN_VERSION >= 91500)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(91500, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_BEHAVIOR_NOTE_CUBLASLT_DEPENDENCY;
             return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
 #else
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
@@ -1392,6 +1484,10 @@ convert_from_cudnn_type(cudnnBackendBehaviorNote_t const cudnn_mode) {
 #if (CUDNN_VERSION >= 90500)
         case CUDNN_BEHAVIOR_NOTE_SUPPORTS_CUDA_GRAPH_NATIVE_API:
             return BehaviorNote_t::SUPPORTS_CUDA_GRAPH_NATIVE_API;
+#endif
+#if (CUDNN_VERSION >= 91500)
+        case CUDNN_BEHAVIOR_NOTE_CUBLASLT_DEPENDENCY:
+            return BehaviorNote_t::CUBLASLT_DEPENDENCY;
 #endif
 
 #ifndef NO_DEFAULT_IN_SWITCH
@@ -1596,6 +1692,38 @@ convert_to_cudnn_type(cudnn_frontend::DescriptorType_t const mode, cudnnBackendD
 #else
             return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
 #endif
+        case DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR:
+#if (CUDNN_VERSION >= 91500)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(91500, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_BACKEND_OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+        case DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR:
+#if (CUDNN_VERSION >= 92200) && (CUDNN_VERSION < 99900)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(92200, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_BACKEND_OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+        case DescriptorType_t::OPERATION_TRANSPOSE_DESCRIPTOR:
+#if (CUDNN_VERSION >= 92200) && (CUDNN_VERSION < 99900)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(92200, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_BACKEND_OPERATION_TRANSPOSE_DESCRIPTOR;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+        case DescriptorType_t::OPERATION_SLICE_DESCRIPTOR:
+#if (CUDNN_VERSION >= 92200) && (CUDNN_VERSION < 99900)
+            NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(92200, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+            cudnn_mode = CUDNN_BACKEND_OPERATION_SLICE_DESCRIPTOR;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#else
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
 
 #ifndef NO_DEFAULT_IN_SWITCH
         default:
@@ -1710,6 +1838,26 @@ convert_to_cudnn_type(cudnn_frontend::NormFwdPhase_t const mode, cudnnBackendNor
     }
     return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
 }
+
+#if (CUDNN_VERSION >= 92200)
+static inline cudnnStatus_t
+convert_to_cudnn_type(cudnn_frontend::ReshapeMode_t const mode, cudnnBackendReshapeMode_t& cudnn_mode) {
+    switch (mode) {
+        case ReshapeMode_t::VIEW_ONLY:
+            cudnn_mode = CUDNN_RESHAPE_VIEW_ONLY;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+        case ReshapeMode_t::LOGICAL:
+            cudnn_mode = CUDNN_RESHAPE_LOGICAL;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+
+#ifndef NO_DEFAULT_IN_SWITCH
+        default:
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+    }
+    return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+}
+#endif
 
 // To be deprecated. Only exists as setResampleMode(cudnnPaddingMode_t) requires it.
 static inline void
@@ -1841,6 +1989,27 @@ convert_from_cudnn_type(cudnnBackendNormFwdPhase_t const cudnn_mode, cudnn_front
 #endif
     }
 }
+
+#if (CUDNN_VERSION >= 92200)
+// To be deprecated. Only exists as setReshapeMode(cudnnBackendReshapeMode_t) requires it.
+static inline void
+convert_from_cudnn_type(cudnnBackendReshapeMode_t const cudnn_mode, cudnn_frontend::ReshapeMode_t& mode) {
+    mode = ReshapeMode_t::NOT_SET;
+    switch (cudnn_mode) {
+        case CUDNN_RESHAPE_VIEW_ONLY:
+            mode = ReshapeMode_t::VIEW_ONLY;
+            break;
+        case CUDNN_RESHAPE_LOGICAL:
+            mode = ReshapeMode_t::LOGICAL;
+            break;
+
+#ifndef NO_DEFAULT_IN_SWITCH
+        default:
+            break;
+#endif
+    }
+}
+#endif
 
 static inline cudnnStatus_t
 convert_to_cudnn_type(cudnn_frontend::TensorReordering_t const mode, cudnnBackendTensorReordering_t& cudnn_mode) {
@@ -1996,6 +2165,21 @@ convert_from_cudnn_type(cudnnBackendDescriptorType_t const cudnn_mode) {
             return DescriptorType_t::OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR;
         case CUDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR:
             return DescriptorType_t::OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR;
+#endif
+#if (CUDNN_VERSION >= 91500)
+        case CUDNN_BACKEND_OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR:
+            return DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_DESCRIPTOR;
+#endif
+#if (CUDNN_VERSION >= 92200) && (CUDNN_VERSION < 99900)
+        case CUDNN_BACKEND_OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR:
+            return DescriptorType_t::OPERATION_MOE_GROUPED_MATMUL_BWD_DESCRIPTOR;
+#endif
+
+#if (CUDNN_VERSION >= 92200) && (CUDNN_VERSION < 99900)
+        case CUDNN_BACKEND_OPERATION_TRANSPOSE_DESCRIPTOR:
+            return DescriptorType_t::OPERATION_TRANSPOSE_DESCRIPTOR;
+        case CUDNN_BACKEND_OPERATION_SLICE_DESCRIPTOR:
+            return DescriptorType_t::OPERATION_SLICE_DESCRIPTOR;
 #endif
 
 #ifndef NO_DEFAULT_IN_SWITCH
@@ -2160,17 +2344,23 @@ convert_from_cudnn_type(cudnnDataType_t const cudnn_mode) {
         case CUDNN_DATA_FAST_FLOAT_FOR_FP8:
             return DataType_t::FAST_FLOAT_FOR_FP8;
 #endif
-#if (CUDNN_VERSION >= 90700)  // TODO: v9.99 is new feature branch; switch to release branch when ready
+#if (CUDNN_VERSION >= 90700)
         case CUDNN_DATA_FP8_E8M0:
             return DataType_t::FP8_E8M0;
 #endif
-#if (CUDNN_VERSION >= 90700)  // TODO: v9.99 is new feature branch; switch to release branch when ready
+#if (CUDNN_VERSION >= 90700)
         case CUDNN_DATA_FP4_E2M1:
             return DataType_t::FP4_E2M1;
 #endif
 #if (CUDNN_VERSION >= 91100)
         case CUDNN_DATA_INT4:
             return DataType_t::INT4;
+#endif
+#if (CUDNN_VERSION >= 91400)
+        case CUDNN_DATA_COMPLEX_FP32:
+            return DataType_t::COMPLEX_FP32;
+        case CUDNN_DATA_COMPLEX_FP64:
+            return DataType_t::COMPLEX_FP64;
 #endif
 #ifndef NO_DEFAULT_IN_SWITCH
         default:
@@ -2186,8 +2376,16 @@ get_element_size_in_bits(cudnn_frontend::DataType_t datatype) {
         case DataType_t::INT8x32:
             return 256;
             break;
+#if (CUDNN_VERSION >= 91400)
+        case DataType_t::COMPLEX_FP64:
+            return 128;
+            break;
+#endif
         case DataType_t::DOUBLE:
         case DataType_t::INT64:
+#if (CUDNN_VERSION >= 91400)
+        case DataType_t::COMPLEX_FP32:
+#endif
             return 64;
             break;
         case DataType_t::FLOAT:
@@ -2300,6 +2498,46 @@ convert_from_cudnn_type(cudnnRngDistribution_t const cudnn_mode) {
 #endif
     }
     return RngDistribution_t::NOT_SET;
+}
+#endif
+
+#if (CUDNN_VERSION >= 91500)
+static inline cudnnStatus_t
+convert_to_cudnn_type(cudnn_frontend::MoeGroupedMatmulMode_t const mode, cudnnMoeGroupedMatmulMode_t& cudnn_mode) {
+    NV_CUDNN_FE_DYNAMIC_CHECK_CUDNN_BACKEND_VERSION(91500, cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE);
+    switch (mode) {
+        case MoeGroupedMatmulMode_t::NONE:
+            cudnn_mode = CUDNN_MOE_GROUPED_MATMUL_MODE_NONE;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+        case MoeGroupedMatmulMode_t::GATHER:
+            cudnn_mode = CUDNN_MOE_GROUPED_MATMUL_MODE_GATHER;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+        case MoeGroupedMatmulMode_t::SCATTER:
+            cudnn_mode = CUDNN_MOE_GROUPED_MATMUL_MODE_SCATTER;
+            return cudnnStatus_t::CUDNN_STATUS_SUCCESS;
+#ifndef NO_DEFAULT_IN_SWITCH
+        default:
+            return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+#endif
+    }
+    return cudnnStatus_t::CUDNN_STATUS_INVALID_VALUE;
+}
+
+static inline cudnn_frontend::MoeGroupedMatmulMode_t
+convert_from_cudnn_type(cudnnMoeGroupedMatmulMode_t const cudnn_mode) {
+    switch (cudnn_mode) {
+        case CUDNN_MOE_GROUPED_MATMUL_MODE_NONE:
+            return MoeGroupedMatmulMode_t::NONE;
+        case CUDNN_MOE_GROUPED_MATMUL_MODE_GATHER:
+            return MoeGroupedMatmulMode_t::GATHER;
+        case CUDNN_MOE_GROUPED_MATMUL_MODE_SCATTER:
+            return MoeGroupedMatmulMode_t::SCATTER;
+#ifndef NO_DEFAULT_IN_SWITCH
+        default:
+            return MoeGroupedMatmulMode_t::NOT_SET;
+#endif
+    }
+    return MoeGroupedMatmulMode_t::NOT_SET;
 }
 #endif
 

@@ -298,6 +298,13 @@ NLOHMANN_JSON_SERIALIZE_ENUM(Reshape_attributes::input_names,
 
 NLOHMANN_JSON_SERIALIZE_ENUM(Reshape_attributes::output_names, {{Reshape_attributes::output_names::Y, "Y"}})
 
+NLOHMANN_JSON_SERIALIZE_ENUM(Transpose_attributes::input_names,
+                             {
+                                 {Transpose_attributes::input_names::X, "X"},
+                             })
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Transpose_attributes::output_names, {{Transpose_attributes::output_names::Y, "Y"}})
+
 NLOHMANN_JSON_SERIALIZE_ENUM(Rmsnorm_attributes::input_names,
                              {
                                  {Rmsnorm_attributes::input_names::X, "X"},
@@ -369,11 +376,14 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_attributes::input_names,
                                  {SDPA_attributes::input_names::Descale_S, "Descale_S"},
                                  {SDPA_attributes::input_names::Scale_S, "Scale_S"},
                                  {SDPA_attributes::input_names::Scale_O, "Scale_O"},
+                                 {SDPA_attributes::input_names::SINK_TOKEN, "SINK_TOKEN"},
                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_attributes::output_names,
                              {{SDPA_attributes::output_names::O, "O"},
                               {SDPA_attributes::output_names::Stats, "Stats"},
+                              {SDPA_attributes::output_names::Max, "Max"},
+                              {SDPA_attributes::output_names::Sum_exp, "Sum_exp"},
                               {SDPA_attributes::output_names::RNG_DUMP, "RNG_DUMP"},
                               {SDPA_attributes::output_names::Amax_S, "Amax_S"},
                               {SDPA_attributes::output_names::Amax_O, "Amax_O"}})
@@ -395,6 +405,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_backward_attributes::input_names,
                                  {SDPA_backward_attributes::input_names::Dropout_mask, "Dropout_mask"},
                                  {SDPA_backward_attributes::input_names::Dropout_scale, "Dropout_scale"},
                                  {SDPA_backward_attributes::input_names::Dropout_scale_inv, "Dropout_scale_inv"},
+                                 {SDPA_backward_attributes::input_names::SINK_TOKEN, "SINK_TOKEN"},
                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_backward_attributes::output_names,
@@ -404,6 +415,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_backward_attributes::output_names,
                                  {SDPA_backward_attributes::output_names::dV, "dV"},
                                  {SDPA_backward_attributes::output_names::dBias, "dBias"},
                                  {SDPA_backward_attributes::output_names::RNG_DUMP, "RNG_DUMP"},
+                                 {SDPA_backward_attributes::output_names::DSINK_TOKEN, "DSINK_TOKEN"},
                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(Slice_attributes::output_names,
@@ -418,10 +430,14 @@ NLOHMANN_JSON_SERIALIZE_ENUM(Slice_attributes::input_names,
 NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_fp8_backward_attributes::input_names,
                              {
                                  {SDPA_fp8_backward_attributes::input_names::Q, "Q"},
+                                 {SDPA_fp8_backward_attributes::input_names::Q_T, "Q_T"},
                                  {SDPA_fp8_backward_attributes::input_names::K, "K"},
+                                 {SDPA_fp8_backward_attributes::input_names::K_T, "K_T"},
                                  {SDPA_fp8_backward_attributes::input_names::V, "V"},
                                  {SDPA_fp8_backward_attributes::input_names::O, "O"},
                                  {SDPA_fp8_backward_attributes::input_names::dO, "dO"},
+                                 {SDPA_fp8_backward_attributes::input_names::dO_T, "dO_T"},
+                                 {SDPA_fp8_backward_attributes::input_names::dO_f16, "dO_f16"},
                                  {SDPA_fp8_backward_attributes::input_names::Stats, "Stats"},
                                  {SDPA_fp8_backward_attributes::input_names::Attn_scale, "Attn_scale"},
                                  {SDPA_fp8_backward_attributes::input_names::Bias, "Bias"},
@@ -438,6 +454,9 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_fp8_backward_attributes::input_names,
                                  {SDPA_fp8_backward_attributes::input_names::Descale_V, "Descale_V"},
                                  {SDPA_fp8_backward_attributes::input_names::Descale_O, "Descale_O"},
                                  {SDPA_fp8_backward_attributes::input_names::Descale_dO, "Descale_dO"},
+                                 {SDPA_fp8_backward_attributes::input_names::Descale_dO_T, "Descale_dO_T"},
+                                 {SDPA_fp8_backward_attributes::input_names::Descale_K_T, "Descale_K_T"},
+                                 {SDPA_fp8_backward_attributes::input_names::Descale_Q_T, "Descale_Q_T"},
                                  {SDPA_fp8_backward_attributes::input_names::Descale_S, "Descale_S"},
                                  {SDPA_fp8_backward_attributes::input_names::Descale_dP, "Descale_dP"},
                                  {SDPA_fp8_backward_attributes::input_names::Scale_dQ, "Scale_dQ"},
@@ -445,6 +464,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_fp8_backward_attributes::input_names,
                                  {SDPA_fp8_backward_attributes::input_names::Scale_dV, "Scale_dV"},
                                  {SDPA_fp8_backward_attributes::input_names::Scale_S, "Scale_S"},
                                  {SDPA_fp8_backward_attributes::input_names::Scale_dP, "Scale_dP"},
+                                 {SDPA_fp8_backward_attributes::input_names::SINK_TOKEN, "SINK_TOKEN"},
                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_fp8_backward_attributes::output_names,
@@ -456,6 +476,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SDPA_fp8_backward_attributes::output_names,
                                  {SDPA_fp8_backward_attributes::output_names::Amax_dK, "Amax_dK"},
                                  {SDPA_fp8_backward_attributes::output_names::Amax_dV, "Amax_dV"},
                                  {SDPA_fp8_backward_attributes::output_names::Amax_dP, "Amax_d"},
+                                 {SDPA_fp8_backward_attributes::output_names::DSINK_TOKEN, "DSINK_TOKEN"},
                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(Block_scale_quantize_attributes::input_names,
@@ -485,6 +506,32 @@ NLOHMANN_JSON_SERIALIZE_ENUM(Concatenate_attributes::output_names,
                                  {Concatenate_attributes::output_names::Y, "Y"},
                              })
 
+NLOHMANN_JSON_SERIALIZE_ENUM(Moe_grouped_matmul_attributes::input_names,
+                             {
+                                 {Moe_grouped_matmul_attributes::input_names::Token, "Token"},
+                                 {Moe_grouped_matmul_attributes::input_names::Weight, "Weight"},
+                                 {Moe_grouped_matmul_attributes::input_names::FirstTokenOffset, "FirstTokenOffset"},
+                                 {Moe_grouped_matmul_attributes::input_names::TokenIndex, "TokenIndex"},
+                                 {Moe_grouped_matmul_attributes::input_names::TokenKs, "TokenKs"},
+                             })
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Moe_grouped_matmul_attributes::output_names,
+                             {
+                                 {Moe_grouped_matmul_attributes::output_names::Output, "Output"},
+                             })
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Moe_grouped_matmul_bwd_attributes::input_names,
+                             {
+                                 {Moe_grouped_matmul_bwd_attributes::input_names::DOutput, "DOutput"},
+                                 {Moe_grouped_matmul_bwd_attributes::input_names::Token, "Token"},
+                                 {Moe_grouped_matmul_bwd_attributes::input_names::FirstTokenOffset, "FirstTokenOffset"},
+                             })
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Moe_grouped_matmul_bwd_attributes::output_names,
+                             {
+                                 {Moe_grouped_matmul_bwd_attributes::output_names::DWeight, "DWeight"},
+                             })
+
 inline void
 to_json(nlohmann::json& j, const Tensor_attributes& ta) {
     j = nlohmann::json{{"name", ta.name},
@@ -497,6 +544,10 @@ to_json(nlohmann::json& j, const Tensor_attributes& ta) {
                        {"reordering_type", ta.reordering_type},
                        {"uid", ta.uid},
                        {"uid_assigned", ta.uid_assigned}};
+    if (ta.ragged_offset) {
+        j["ragged_offset_uid"]  = ta.ragged_offset->get_uid();
+        j["ragged_offset_name"] = ta.ragged_offset->get_name();
+    }
 }
 
 inline void

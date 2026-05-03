@@ -1,3 +1,5 @@
+# @EUGO_CHANGE: This whole file basically was replaced
+
 [build-system]
 build-backend = 'mesonpy'
 
@@ -11,7 +13,7 @@ requires = [
 [project]
 name = "cuda-cudnn-frontend"
 dynamic = ["version"]
-description = "CUDNN FrontEnd python library"
+description = "NVIDIA cuDNN Frontend — Python and C++ Graph API with SOTA attention (SDPA / Flash Attention), MoE grouped GEMM fusions, and FP8/MXFP8 kernels for Hopper and Blackwell GPUs."
 readme = "README.md"
 authors = [
     {name = "Eugo, Inc."},

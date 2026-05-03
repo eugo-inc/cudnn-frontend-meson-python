@@ -103,9 +103,7 @@ def _f32_to_floatx_unpacked(x: torch.Tensor, ebits: int, mbits: int) -> torch.Te
     denorm_mask_int = denorm_exp << MBITS_F32
 
     # reinterpret int32 as float32
-    denorm_mask_float = torch.tensor(denorm_mask_int, dtype=torch.int32).view(
-        torch.float32
-    )
+    denorm_mask_float = torch.tensor(denorm_mask_int, dtype=torch.int32).view(torch.float32)
 
     # save the sign
     # Note that we have torch.uint32, but some ops like cpu bit shifts
@@ -244,17 +242,13 @@ def _floatx_unpacked_to_f32(x: torch.Tensor, ebits: int, mbits: int) -> torch.Te
                 # left shift mantissa until it overflows (create an implicit 1)
                 # subtract exponent by the same amount
                 left_shift = mbits - i
-                mantissa_f32 = (mantissa_cmp - (1 << i)) << (
-                    left_shift + MBITS_F32 - mbits
-                )
+                mantissa_f32 = (mantissa_cmp - (1 << i)) << (left_shift + MBITS_F32 - mbits)
                 exp_biased_f32 = (denormal_exp_biased - left_shift) << MBITS_F32
 
                 # we can update this in-place since the values won't overlap
                 # torch.compile() may complain unsupported operand type(s) for |: 'SymInt' and 'int'
                 # thus we use + instead of | here
-                mantissa_lp_int32[mantissa_lp_int32 == mantissa_cmp] = (
-                    exp_biased_f32 + mantissa_f32
-                )
+                mantissa_lp_int32[mantissa_lp_int32 == mantissa_cmp] = exp_biased_f32 + mantissa_f32
 
         result = torch.where(denormal_mask, mantissa_lp_int32, result)
 
@@ -266,7 +260,7 @@ def _floatx_unpacked_to_f32(x: torch.Tensor, ebits: int, mbits: int) -> torch.Te
 
 
 def get_cc():
-    (major, minor) = torch.cuda.get_device_capability()
+    major, minor = torch.cuda.get_device_capability()
     return major * 10 + minor
 
 
@@ -279,9 +273,7 @@ def matmul_dequantize_cache_key(cudnn_handle, A, B, A_scale, B_scale, BLOCK_SIZE
 
 @cudnn.jit(heur_modes=[cudnn.heur_mode.A, cudnn.heur_mode.B])
 @cudnn.graph_cache(key_fn=matmul_dequantize_cache_key)
-def create_matmul_dequantize_graph(
-    cudnn_handle, A, B, A_descale, B_descale, BLOCK_SIZE
-):
+def create_matmul_dequantize_graph(cudnn_handle, A, B, A_descale, B_descale, BLOCK_SIZE):
 
     with cudnn.graph(cudnn_handle) as (g, _):
 
@@ -322,12 +314,8 @@ def create_matmul_dequantize_graph(
             reordering_type=cudnn.tensor_reordering.F8_128x4,
         )
 
-        after_descale_a = g.block_scale_dequantize(
-            A_cudnn_tensor, A_descale_tensor, block_size=[1, BLOCK_SIZE]
-        )
-        after_descale_b = g.block_scale_dequantize(
-            B_cudnn_tensor, B_descale_tensor, block_size=[BLOCK_SIZE, 1]
-        )
+        after_descale_a = g.block_scale_dequantize(A_cudnn_tensor, A_descale_tensor, block_size=[1, BLOCK_SIZE])
+        after_descale_b = g.block_scale_dequantize(B_cudnn_tensor, B_descale_tensor, block_size=[BLOCK_SIZE, 1])
 
         C = g.matmul(
             after_descale_a,
@@ -354,12 +342,44 @@ def pack_uint4(uint8_data) -> torch.Tensor:
     return (uint8_data[1::2] << 4 | uint8_data[::2]).view(down_size(shape))
 
 
+def unpack_uint4(packed_data):
+    """Unpack uint4 data from packed uint8 format.
+    Reverses the operation of pack_uint4.
+    """
+    shape = packed_data.shape
+    # Create output shape with last dimension doubled
+    unpacked_shape = (*shape[:-1], shape[-1] * 2)
+
+    # View as uint8 and flatten
+    packed_uint8 = packed_data.view(torch.uint8).contiguous().view(-1)
+
+    # Create unpacked array
+    unpacked = torch.zeros(packed_uint8.shape[0] * 2, dtype=torch.uint8, device=packed_data.device)
+
+    # Extract lower and upper 4 bits
+    unpacked[::2] = packed_uint8 & 0x0F  # Lower 4 bits
+    unpacked[1::2] = (packed_uint8 >> 4) & 0x0F  # Upper 4 bits
+
+    return unpacked.view(unpacked_shape)
+
+
 def _bfloat16_to_float4_e2m1fn_x2(x):
     assert x.dtype == torch.bfloat16
     x = _f32_to_floatx_unpacked(x.float(), FP4_EBITS, FP4_MBITS)
     x = pack_uint4(x)
     x = x.view(torch.float4_e2m1fn_x2)
     return x
+
+
+def float4_e2m1fn_x2_to_float32(fp4_tensor):
+    """Convert torch.float4_e2m1fn_x2 tensor to torch.float32."""
+    # View as uint8 and unpack
+    unpacked_uint8 = unpack_uint4(fp4_tensor)
+
+    # Convert to float32 using the existing conversion function
+    f32_tensor = _floatx_unpacked_to_f32(unpacked_uint8, FP4_EBITS, FP4_MBITS)
+
+    return f32_tensor
 
 
 @pytest.mark.skipif(get_cc() < 100, reason="requires Blackwell or newer arch")
@@ -393,16 +413,10 @@ def test_low_precision_fp4_matmul(cudnn_handle):
     A = _bfloat16_to_float4_e2m1fn_x2(A_ref)
     B = _bfloat16_to_float4_e2m1fn_x2(B_ref)
 
-    A_descale = torch.full(
-        (batch_size, M, K), 1.0, dtype=torch.float8_e4m3fn, device="cuda"
-    )
-    B_descale = torch.full(
-        (batch_size, K, N), 1.0, device="cuda", dtype=torch.float8_e4m3fn
-    )
+    A_descale = torch.full((batch_size, M, K), 1.0, dtype=torch.float8_e4m3fn, device="cuda")
+    B_descale = torch.full((batch_size, K, N), 1.0, device="cuda", dtype=torch.float8_e4m3fn)
 
-    g, uids = create_matmul_dequantize_graph(
-        cudnn_handle, A, B, A_descale, B_descale, BLOCK_SIZE
-    )
+    g, uids = create_matmul_dequantize_graph(cudnn_handle, A, B, A_descale, B_descale, BLOCK_SIZE)
 
     A_uid, B_uid, A_descale_uid, B_descale_uid, C_uid = uids
 

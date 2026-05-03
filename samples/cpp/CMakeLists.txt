@@ -10,13 +10,23 @@ add_executable(
     sdpa/fp16_bwd_with_flexible_graphs.cpp
     sdpa/fp16_fwd_with_custom_dropout.cpp
     sdpa/fp16_fwd_with_paged_caches.cpp
+    sdpa/fp16_dynamic_shapes.cpp
     sdpa/fp16_fwd_paged_decode_and_prefill.cpp
     sdpa/fp16_fwd_with_cudagraphs.cpp
     sdpa/fp16_bwd_with_cudagraphs.cpp
     sdpa/fp8_fwd.cpp
+    sdpa/mxfp8_fwd.cpp
+    sdpa/mxfp8_bwd.cpp
+    sdpa/fp8_fwd_current_scaling.cpp
+    sdpa/fp8_bwd_with_current_scaling.cpp
     sdpa/fp8_bwd.cpp
     sdpa/fp8_fwd_bottom_right_causal_mask.cpp
     sdpa/fp8_bwd_bottom_right_causal_mask.cpp
+    sdpa/fp16_fwd_with_sink_token.cpp
+    sdpa/fp16_bwd_with_sink_token.cpp
+    sdpa/fp16_fwd_with_max_and_sum_exp.cpp
+    sdpa/fp16_fwd_with_block_mask.cpp
+    sdpa/prefill_oss_engine.cpp
 
     convolution/fprop.cpp
     convolution/fp8_fprop.cpp
@@ -31,6 +41,9 @@ add_executable(
     matmul/mixed_matmul.cpp
     matmul/blackwell_nvfp4_mxfp8_block_scale_matmul.cpp
     matmul/general_block_scale_matmul.cpp
+    matmul/complex_fp32_matmul.cpp
+
+    moe_grouped_matmul/moe_grouped_matmul.cpp
 
     norm/batchnorm.cpp
     norm/layernorm.cpp
@@ -50,6 +63,16 @@ add_executable(
     misc/sm_carveout.cpp
     misc/cudagraphs.cpp
     misc/deviceless_aot_compilation.cpp
+    misc/compile_time_constant_example.cpp
+
+    membound/transpose.cpp
+    membound/reshape.cpp
+    membound/slice.cpp
+    membound/concat.cpp
+    membound/membound_fusion.cpp
+    membound/boolean_fusion.cpp
+
+    causal_conv1d/causal_conv1d.cpp
 )
 
 # target flags
@@ -84,9 +107,12 @@ target_link_libraries(
 
     CUDA::cublasLt
     CUDA::cudart
-    CUDA::cuda_driver # Needed as calls all CUDA calls will eventually move to driver
     CUDA::nvrtc
 )
+
+if(TARGET CUDNN::cudnn_ext)
+    target_link_libraries(samples PRIVATE CUDNN::cudnn_ext)
+endif()
 
 # target cmake properties
 set_target_properties(

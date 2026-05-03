@@ -1,9 +1,5 @@
 #pragma once
 
-#include "../../cudnn_frontend_MatMulDesc.h"
-#include "../../cudnn_frontend_Heuristics.h"
-#include "../../cudnn_frontend_Logging.h"
-
 #include "../graph_helpers.h"
 #include "../node_interface.h"
 
@@ -23,7 +19,7 @@ class MatmulFP8Node : public NodeCRTP<MatmulFP8Node> {
 
     error_t
     infer_properties_node() override final {
-        CUDNN_FE_LOG_LABEL_ENDL("INFO: Inferrencing properties for matmul fp8 node " << attributes.name << "...");
+        CUDNN_FE_LOG_LABEL_ENDL("INFO:     Inferrencing properties for matmul fp8 node " << attributes.name);
 
         attributes.fill_from_context(context);
 
