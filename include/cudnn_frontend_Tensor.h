@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -56,20 +57,23 @@ class Tensor_v8 : public BackendDescriptor {
     std::string
     describe() const override {
         std::stringstream ss;
+        ss << "               CUDNN_BACKEND_TENSOR_DESCRIPTOR :\n"
 #ifndef CUDNN_FRONTEND_SKIP_JSON_LIB
-        ss << "CUDNN_BACKEND_TENSOR_DESCRIPTOR :" << " Datatype: " << json{data_type} << " Id: " << std::to_string(id)
+           << "                                   Datatype: " << json{data_type}
 #else
-        ss << "CUDNN_BACKEND_TENSOR_DESCRIPTOR :" << " Datatype: " << int(data_type) << " Id: " << std::to_string(id)
+           << "                                   Datatype: " << int(data_type)
 #endif
-           << " nDims " << nDims << " VectorCount: " << vectorCount << " vectorDimension " << vectorDimension;
-        ss << " Dim [ ";
+           << "\n                                   Id: " << id << "\n                                   Dims " << nDims
+           << "\n                                   VectorCount: " << vectorCount
+           << "\n                                   vectorDimension " << vectorDimension;
+        ss << "\n                                   Dim [ ";
         for (auto i = 0; i < nDims; i++) {
             if (i != 0) {
                 ss << ',';
             }
             ss << btensor_dimA[i];
         }
-        ss << " ] Str [ ";
+        ss << " ]\n                                   Str [ ";
         for (auto i = 0; i < nDims; i++) {
             if (i != 0) {
                 ss << ',';
@@ -77,12 +81,17 @@ class Tensor_v8 : public BackendDescriptor {
             ss << btensor_strA[i];
         }
         ss << " ]";
-        ss << " isVirtual: " << isVirtual << " isByValue: " << isByValue << " Alignment: " << alignment;
+        ss << "\n                                   isVirtual: " << isVirtual
+           << "\n                                   isByValue: " << isByValue
+           << "\n                                   Alignment: " << alignment;
 #ifndef CUDNN_FRONTEND_SKIP_JSON_LIB
-        ss << " reorder_type: " << json{reorder_type};
+        ss << "\n                                   reorder_type: " << json{reorder_type};
 #else
-        ss << " reorder_type: " << int(reorder_type);
+        ss << "\n                                   reorder_type: " << int(reorder_type);
 #endif
+        if (raggedOffset != nullptr) {
+            ss << "\n                                   raggedOffset: Enabled UID: " << raggedOffset->getId();
+        }
         return ss.str();
     }
 
@@ -171,6 +180,10 @@ class Tensor_v8 : public BackendDescriptor {
     int64_t vectorCount     = 1;      //! What is the vectorization count (4 or 32)
     bool isVirtual          = false;  //! Whether it is an intermediate tensor of an op graph
     bool isByValue = false;  //! Whether the tensor is in host memory that needs to be passed to the kernel by value
+
+    bool hasConstValue = false;            //! Whether this tensor has a compile-time constant value
+    std::vector<uint8_t> constValueBytes;  //! Raw bytes of the compile-time constant value
+
     cudnn_frontend::TensorReordering_t reorder_type =
         cudnn_frontend::TensorReordering_t::NONE;  //! Type of reordering in the tensor
     std::shared_ptr<Tensor_v8> raggedOffset;       //! Ragged offsets for ragged tensors
@@ -234,6 +247,18 @@ class TensorBuilder_v8 {
         m_tensor.isByValue = isByValue_;
         return *this;
     }
+
+    //! Set compile-time constant value for this tensor
+    template <typename T>
+    auto
+    setConstValue(T const &value) -> TensorBuilder_v8 & {
+        m_tensor.hasConstValue = true;
+        m_tensor.constValueBytes.resize(sizeof(T));
+        std::memcpy(m_tensor.constValueBytes.data(), &value, sizeof(T));
+        m_tensor.isByValue = true;
+        return *this;
+    }
+
     auto
     setVectorCountAndDimension(int64_t vectorCount_, int64_t vectorDimension_) -> TensorBuilder_v8 & {
         m_tensor.vectorCount     = vectorCount_;
@@ -498,6 +523,38 @@ class TensorBuilder_v8 {
                 return std::move(m_tensor);
             }
         }
+
+        // Set compile-time constant value (if present); CUDNN_ATTR_TENSOR_CONSTANT_VALUE is cuDNN 9.22.0+
+#if (CUDNN_VERSION >= 92200)
+        NV_CUDNN_FE_DYNAMIC_CHECK_BACKEND_DESCRIPTOR(92200,
+                                                     m_tensor,
+                                                     "CUDNN_BACKEND_TENSOR_DESCRIPTOR: SetAttribute "
+                                                     "CUDNN_ATTR_TENSOR_CONSTANT_VALUE requires cudnn version 9.22.0");
+        if (m_tensor.hasConstValue) {
+            void *value_ptr = m_tensor.constValueBytes.data();
+            status          = detail::set_attribute(m_tensor.pointer->get_backend_descriptor(),
+                                           CUDNN_ATTR_TENSOR_CONSTANT_VALUE,
+                                           CUDNN_TYPE_VOID_PTR,
+                                           1,
+                                           &value_ptr);
+            if (status != CUDNN_STATUS_SUCCESS) {
+                set_error_and_throw_exception(
+                    &m_tensor,
+                    status,
+                    "CUDNN_BACKEND_TENSOR_DESCRIPTOR: SetAttribute CUDNN_ATTR_TENSOR_CONSTANT_VALUE Failed");
+                return std::move(m_tensor);
+            }
+        }
+#else
+        if (m_tensor.hasConstValue) {
+            set_error_and_throw_exception(
+                &m_tensor,
+                CUDNN_STATUS_INVALID_VALUE,
+                "CUDNN_BACKEND_TENSOR_DESCRIPTOR: CUDNN_ATTR_TENSOR_CONSTANT_VALUE requires cudnn version 9.22.0");
+            return std::move(m_tensor);
+        }
+#endif  // CUDNN_VERSION >= 92200
+
         // Finalizing the descriptor
         status = detail::finalize(m_tensor.pointer->get_backend_descriptor());
         if (status != CUDNN_STATUS_SUCCESS) {

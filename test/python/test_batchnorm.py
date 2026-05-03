@@ -74,17 +74,15 @@ def test_bn_relu_with_mask(cudnn_handle):
     momentum = graph.tensor_like(momentum_cpu)
     comparison = graph.tensor_like(x_gpu)
 
-    y_before_relu, saved_mean, saved_inv_var, out_running_mean, out_running_var = (
-        graph.batchnorm(
-            name="BN",
-            input=x,
-            scale=scale,
-            bias=bias,
-            in_running_mean=in_running_mean,
-            in_running_var=in_running_var,
-            epsilon=epsilon,
-            momentum=momentum,
-        )
+    y_before_relu, saved_mean, saved_inv_var, out_running_mean, out_running_var = graph.batchnorm(
+        name="BN",
+        input=x,
+        scale=scale,
+        bias=bias,
+        in_running_mean=in_running_mean,
+        in_running_var=in_running_var,
+        epsilon=epsilon,
+        momentum=momentum,
     )
     y = graph.relu(name="relu", input=y_before_relu)
     mask = graph.cmp_gt(name="cmp", input=y, comparison=comparison)
@@ -98,8 +96,14 @@ def test_bn_relu_with_mask(cudnn_handle):
 
     graph.validate()
     graph.build_operation_graph()
-    graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
-    graph.check_support()
+
+    try:
+        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
+        graph.check_support()
+    except cudnn.cudnnGraphNotSupportedError as e:
+        print(f"TEST WAIVED: unsupported graph. {e}")
+        pytest.skip("TEST WAIVED: unsupported graph.")
+
     graph.build_plans()
 
     # cudnn graph execution
@@ -119,9 +123,7 @@ def test_bn_relu_with_mask(cudnn_handle):
         comparison: comparison_gpu,
         mask: mask_gpu,
     }
-    workspace = torch.empty(
-        graph.get_workspace_size(), device="cuda", dtype=torch.uint8
-    )
+    workspace = torch.empty(graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
     graph.execute(
         variant_pack,
         workspace,
@@ -160,9 +162,7 @@ def test_bn_relu_with_mask(cudnn_handle):
     # fmt: on
 
 
-@pytest.mark.parametrize(
-    "dump_dX_dRelu", [True, False], ids=lambda p: f"dump_dX_dRelu{int(p)}"
-)
+@pytest.mark.parametrize("dump_dX_dRelu", [True, False], ids=lambda p: f"dump_dX_dRelu{int(p)}")
 @pytest.mark.skipif(
     LooseVersion(cudnn.backend_version_string()) < "8.9",
     reason="DBN fusions not supported below cudnn 8.9",
@@ -229,8 +229,14 @@ def test_drelu_dadd_dbn(dump_dX_dRelu, cudnn_handle):
 
     graph.validate()
     graph.build_operation_graph()
-    graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
-    graph.check_support()
+
+    try:
+        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
+        graph.check_support()
+    except cudnn.cudnnGraphNotSupportedError as e:
+        print(f"TEST WAIVED: unsupported graph. {e}")
+        pytest.skip("TEST WAIVED: unsupported graph.")
+
     graph.build_plans()
 
     variant_pack = {
@@ -247,9 +253,7 @@ def test_drelu_dadd_dbn(dump_dX_dRelu, cudnn_handle):
     if dump_dX_dRelu:
         variant_pack[dX_drelu] = dX_dRelu_gpu
 
-    workspace = torch.empty(
-        graph.get_workspace_size(), device="cuda", dtype=torch.uint8
-    )
+    workspace = torch.empty(graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
 
     graph.execute(variant_pack, workspace, handle=cudnn_handle)
     torch.cuda.synchronize()
@@ -296,9 +300,7 @@ def test_bn_infer_drelu_dbn(cudnn_handle):
         stride=x_gpu.stride(),
         data_type=x_gpu.dtype,
     )
-    dY = graph.tensor(
-        name="dY", dim=dY_gpu.size(), stride=dY_gpu.stride(), data_type=dY_gpu.dtype
-    )
+    dY = graph.tensor(name="dY", dim=dY_gpu.size(), stride=dY_gpu.stride(), data_type=dY_gpu.dtype)
     scale = graph.tensor(
         name="scale",
         dim=scale_gpu.size(),
@@ -324,9 +326,7 @@ def test_bn_infer_drelu_dbn(cudnn_handle):
         data_type=inv_var_gpu.dtype,
     )
 
-    y = graph.batchnorm_inference(
-        input=x, mean=mean, inv_variance=inv_variance, scale=scale, bias=bias
-    )
+    y = graph.batchnorm_inference(input=x, mean=mean, inv_variance=inv_variance, scale=scale, bias=bias)
 
     dX_dRelu = graph.relu_backward(loss=dY, input=y)
 
@@ -347,8 +347,14 @@ def test_bn_infer_drelu_dbn(cudnn_handle):
 
     graph.validate()
     graph.build_operation_graph()
-    graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
-    graph.check_support()
+
+    try:
+        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
+        graph.check_support()
+    except cudnn.cudnnGraphNotSupportedError as e:
+        print(f"TEST WAIVED: unsupported graph. {e}")
+        pytest.skip("TEST WAIVED: unsupported graph.")
+
     graph.build_plans()
 
     variant_pack = {
@@ -363,9 +369,7 @@ def test_bn_infer_drelu_dbn(cudnn_handle):
         dBias: dBias_gpu,
     }
 
-    workspace = torch.empty(
-        graph.get_workspace_size(), device="cuda", dtype=torch.uint8
-    )
+    workspace = torch.empty(graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
 
     graph.execute(variant_pack, workspace, handle=cudnn_handle)
     torch.cuda.synchronize()

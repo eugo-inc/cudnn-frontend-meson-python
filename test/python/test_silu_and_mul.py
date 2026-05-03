@@ -30,15 +30,9 @@ def test_gemm_silu_and_mul(cudnn_handle):
         compute_data_type=cudnn.data_type.FLOAT,
     )
 
-    X_gpu = torch.randint(-8, 8, (1, M, K), requires_grad=False, device="cuda").to(
-        dtype=torch.float8_e4m3fn
-    )
-    W_gpu = torch.randint(-8, 8, (2, K, N), requires_grad=False, device="cuda").to(
-        dtype=torch.float8_e4m3fn
-    )
-    C_gpu = torch.zeros(1, M, N, requires_grad=False, device="cuda").to(
-        dtype=torch.float
-    )
+    X_gpu = torch.randint(-8, 8, (1, M, K), requires_grad=False, device="cuda").to(dtype=torch.float8_e4m3fn)
+    W_gpu = torch.randint(-8, 8, (2, K, N), requires_grad=False, device="cuda").to(dtype=torch.float8_e4m3fn)
+    C_gpu = torch.zeros(1, M, N, requires_grad=False, device="cuda").to(dtype=torch.float)
 
     scale = 0.5
     X_DQ_cpu = torch.full((1, 1, 1), scale, dtype=torch.float32, device="cpu")
@@ -89,9 +83,7 @@ def test_gemm_silu_and_mul(cudnn_handle):
     C_combined = graph.binary_select(C2, C3, B_mask)
 
     C = graph.reduction(C_combined, mode=cudnn.reduction_mode.MUL)
-    C.set_dim([1, M, N]).set_stride([M * N, N, 1]).set_output(True).set_data_type(
-        cudnn.data_type.FLOAT
-    )
+    C.set_dim([1, M, N]).set_stride([M * N, N, 1]).set_output(True).set_data_type(cudnn.data_type.FLOAT)
 
     # The output of reductino operation has to be fp32.
     # Plus, the data is in global memory so its not possible to fuse anything now.
@@ -106,15 +98,13 @@ def test_gemm_silu_and_mul(cudnn_handle):
     # C_fp8.set_output(True)
 
     try:
-        graph.build([cudnn.heur_mode.A])
+        graph.build([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
     except cudnn.cudnnGraphNotSupportedError as e:
-        pytest.xfail(repr(e))
+        pytest.skip(repr(e))
     except Exception as e:
         pytest.fail(repr(e))
 
-    workspace = torch.empty(
-        graph.get_workspace_size(), device="cuda", dtype=torch.uint8
-    )
+    workspace = torch.empty(graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
 
     with profile(activities=[ProfilerActivity.CUDA]) as prof:
         graph.execute(
@@ -154,15 +144,9 @@ def test_silu_and_mul_and_quantization(cudnn_handle):
         compute_data_type=cudnn.data_type.FLOAT,
     )
 
-    C2a_gpu = torch.randint(-8, 8, (1, M, N), requires_grad=False, device="cuda").to(
-        dtype=torch.float8_e4m3fn
-    )
-    C2b_gpu = torch.randint(-8, 8, (1, M, N), requires_grad=False, device="cuda").to(
-        dtype=torch.float8_e4m3fn
-    )
-    C_gpu = torch.empty(1, M, N, requires_grad=False, device="cuda").to(
-        dtype=torch.float8_e4m3fn
-    )
+    C2a_gpu = torch.randint(-8, 8, (1, M, N), requires_grad=False, device="cuda").to(dtype=torch.float8_e4m3fn)
+    C2b_gpu = torch.randint(-8, 8, (1, M, N), requires_grad=False, device="cuda").to(dtype=torch.float8_e4m3fn)
+    C_gpu = torch.empty(1, M, N, requires_grad=False, device="cuda").to(dtype=torch.float8_e4m3fn)
 
     scale = 0.5
     C2_DQ_cpu = torch.full((1, 1, 1), scale, dtype=torch.float32, device="cpu")
@@ -204,10 +188,17 @@ def test_silu_and_mul_and_quantization(cudnn_handle):
     C_fp8 = graph.mul(C_fp32, C_Q)
     C_fp8.set_output(True).set_data_type(cudnn.data_type.FP8_E4M3)
 
-    graph.build([cudnn.heur_mode.A])
-    workspace = torch.empty(
-        graph.get_workspace_size(), device="cuda", dtype=torch.uint8
-    )
+    try:
+        graph.build_operation_graph()
+        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
+        graph.check_support()
+    except cudnn.cudnnGraphNotSupportedError as e:
+        print(f"TEST WAIVED: unsupported graph. {e}")
+        pytest.skip("TEST WAIVED: unsupported graph.")
+
+    graph.build_plans(cudnn.build_plan_policy.HEURISTICS_CHOICE)
+
+    workspace = torch.empty(graph.get_workspace_size(), device="cuda", dtype=torch.uint8)
 
     with profile(activities=[ProfilerActivity.CUDA]) as prof:
         graph.execute(

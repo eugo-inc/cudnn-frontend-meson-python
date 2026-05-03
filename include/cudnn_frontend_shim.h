@@ -69,11 +69,11 @@ load_cuda_so() {
     dlerror();
 
     // Attempt to open the cuda library
-    HMODULE handle    = dlopen("libcuda.so", RTLD_NOW);
+    HMODULE handle    = dlopen("libcuda.so.1", RTLD_NOW);
     const char *error = reinterpret_cast<const char *>(dlerror());
     if (!handle || error) {
         // If opening the library fails, throw an exception with the error message
-        throw std::runtime_error("Unable to dlopen libcuda.so : " + std::string(error ? error : "Unknown error"));
+        throw std::runtime_error("Unable to dlopen libcuda.so.1 : " + std::string(error ? error : "Unknown error"));
     }
 
     return handle;
@@ -193,14 +193,14 @@ get_cuda_symbol(CudaLibrary library, const char *function_name) {
 
 #endif
 
-inline CUresult
-cu_graph_create(CUgraph *pGraph, unsigned int flags) {
-    NV_FE_CALL_TO_CU(cu_graph_create, cuGraphCreate, pGraph, flags);
+inline cudaError_t
+cuda_graph_create(cudaGraph_t *pGraph, unsigned int flags) {
+    NV_FE_CALL_TO_CUDA(cuda_graph_create, cudaGraphCreate, pGraph, flags);
 }
 
-inline CUresult
-cu_graph_get_nodes(CUgraph hGraph, CUgraphNode *nodes, size_t *numNodes) {
-    NV_FE_CALL_TO_CU(cu_graph_get_nodes, cuGraphGetNodes, hGraph, nodes, numNodes);
+inline cudaError_t
+cuda_graph_get_nodes(cudaGraph_t hGraph, cudaGraphNode_t *nodes, size_t *numNodes) {
+    NV_FE_CALL_TO_CUDA(cuda_graph_get_nodes, cudaGraphGetNodes, hGraph, nodes, numNodes);
 }
 
 inline cudaError_t
@@ -313,6 +313,31 @@ cuda_graph_add_memset_node_set_params(cudaGraphNode_t node, const cudaMemsetPara
 }
 
 inline cudaError_t
+cuda_graph_begin_capture(cudaStream_t stream, cudaStreamCaptureMode mode) {
+    NV_FE_CALL_TO_CUDA(cuda_graph_begin_capture, cudaStreamBeginCapture, stream, mode);
+}
+
+inline cudaError_t
+cuda_stream_is_capturing(cudaStream_t stream, cudaStreamCaptureStatus *capture_status) {
+    NV_FE_CALL_TO_CUDA(cuda_stream_is_capturing, cudaStreamIsCapturing, stream, capture_status);
+}
+
+inline cudaError_t
+cuda_stream_create(cudaStream_t *stream) {
+    NV_FE_CALL_TO_CUDA(cuda_stream_create, cudaStreamCreate, stream);
+}
+
+inline cudaError_t
+cuda_stream_destroy(cudaStream_t stream) {
+    NV_FE_CALL_TO_CUDA(cuda_stream_destroy, cudaStreamDestroy, stream);
+}
+
+inline cudaError_t
+cuda_graph_end_capture(cudaStream_t stream, cudaGraph_t *graph) {
+    NV_FE_CALL_TO_CUDA(cuda_graph_end_capture, cudaStreamEndCapture, stream, graph);
+}
+
+inline cudaError_t
 cuda_graph_destroy(cudaGraph_t graph) {
     NV_FE_CALL_TO_CUDA(cuda_graph_destroy, cudaGraphDestroy, graph);
 }
@@ -362,19 +387,34 @@ cuda_get_device(int *device) {
     NV_FE_CALL_TO_CUDA(cuda_get_device, cudaGetDevice, device);
 }
 
+inline cudaError_t
+cuda_pointer_get_attributes(cudaPointerAttributes *attributes, const void *ptr) {
+    NV_FE_CALL_TO_CUDA(cuda_pointer_get_attributes, cudaPointerGetAttributes, attributes, ptr);
+}
+
 inline const char *
 cuda_get_error_string(cudaError_t error) {
     NV_FE_CALL_TO_CUDA(cuda_get_error_string, cudaGetErrorString, error);
 }
 
-inline CUresult
-cu_get_error_string(CUresult error, const char **pStr) {
-    NV_FE_CALL_TO_CU(cu_get_error_string, cuGetErrorString, error, pStr);
-}
-
 inline cudaError_t
 cuda_device_synchronize() {
     NV_FE_CALL_TO_CUDA(cuda_device_synchronize, cudaDeviceSynchronize);
+}
+
+inline cudaError_t
+cuda_stream_synchronize(cudaStream_t stream) {
+    NV_FE_CALL_TO_CUDA(cuda_stream_synchronize, cudaStreamSynchronize, stream);
+}
+
+inline cudaError_t
+cuda_malloc(void **ptr, size_t sz) {
+    NV_FE_CALL_TO_CUDA(cuda_malloc, cudaMalloc, ptr, sz);
+}
+
+inline cudaError_t
+cuda_free(void *ptr) {
+    NV_FE_CALL_TO_CUDA(cuda_free, cudaFree, ptr);
 }
 
 inline cudnnStatus_t
@@ -386,6 +426,70 @@ inline cudnnStatus_t
 destroy_handle(cudnnHandle_t handle) {
     NV_FE_CALL_TO_BACKEND(destroy_handle, cudnnDestroy, handle);
 }
+
+#if CUDNN_VERSION >= 92200
+inline cudnnStatus_t
+causal_conv1d_forward(cudaStream_t stream,
+                      const void *x,
+                      const void *weight,
+                      const void *bias,
+                      void *y,
+                      int batch,
+                      int dim,
+                      int seq_len,
+                      int kernel_size,
+                      cudnnDataType_t data_type,
+                      cudnnCausalConv1dActivation_t activation) {
+    NV_FE_CALL_TO_BACKEND(causal_conv1d_forward,
+                          cudnnCausalConv1dForward,
+                          stream,
+                          x,
+                          weight,
+                          bias,
+                          y,
+                          batch,
+                          dim,
+                          seq_len,
+                          kernel_size,
+                          data_type,
+                          activation);
+}
+
+inline cudnnStatus_t
+causal_conv1d_backward(cudaStream_t stream,
+                       const void *x,
+                       const void *weight,
+                       const void *bias,
+                       const void *dy,
+                       void *dx,
+                       void *dweight,
+                       void *dbias,
+                       int batch,
+                       int dim,
+                       int seq_len,
+                       int kernel_size,
+                       cudnnDataType_t data_type,
+                       cudnnDataType_t dw_data_type,
+                       cudnnCausalConv1dActivation_t activation) {
+    NV_FE_CALL_TO_BACKEND(causal_conv1d_backward,
+                          cudnnCausalConv1dBackward,
+                          stream,
+                          x,
+                          weight,
+                          bias,
+                          dy,
+                          dx,
+                          dweight,
+                          dbias,
+                          batch,
+                          dim,
+                          seq_len,
+                          kernel_size,
+                          data_type,
+                          dw_data_type,
+                          activation);
+}
+#endif
 
 inline size_t
 get_backend_version(void) {

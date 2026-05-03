@@ -25,13 +25,9 @@ class ConcatenateNode : public NodeCRTP<ConcatenateNode> {
 
     error_t
     pre_validate_node() const override final {
-        getLogger() << "[cudnn_frontend] INFO: " << "Validating ConcatenateNode " << attributes.name << "..."
-                    << std::endl;
+        getLogger() << "[cudnn_frontend] INFO: " << "Validating ConcatenateNode " << attributes.name << std::endl;
 
         RETURN_CUDNN_FRONTEND_ERROR_IF(!attributes.axis.has_value(), error_code_t::ATTRIBUTE_NOT_SET, "Axis not set\n");
-
-        RETURN_CUDNN_FRONTEND_ERROR_IF(
-            !attributes.in_place_index.has_value(), error_code_t::ATTRIBUTE_NOT_SET, "In-place index not set\n");
 
         auto X = attributes.inputs;
 
@@ -43,7 +39,7 @@ class ConcatenateNode : public NodeCRTP<ConcatenateNode> {
 
     error_t
     infer_properties_node() override final {
-        getLogger() << "[cudnn_frontend] INFO: Inferring properties for ConcatenateNode " << attributes.name << "..."
+        getLogger() << "[cudnn_frontend] INFO: Inferring properties for ConcatenateNode " << attributes.name
                     << std::endl;
 
         attributes.fill_from_context(context);
@@ -81,7 +77,7 @@ class ConcatenateNode : public NodeCRTP<ConcatenateNode> {
         std::vector<std::shared_ptr<cudnn_frontend::Operation>>& operations,
         managed_backend_descriptor_t& raw_operations,
         std::unordered_map<int64_t, std::shared_ptr<cudnn_frontend::Tensor>>& tensors) const override final {
-        getLogger() << "[cudnn_frontend] INFO: " << "Building ConcatenateNode operations " << attributes.name << "..."
+        getLogger() << "[cudnn_frontend] INFO: " << "Building ConcatenateNode operations " << attributes.name
                     << std::endl;
         auto cudnn_ver_error = error_t{error_code_t::GRAPH_NOT_SUPPORTED, "Concatenate requires cuDNN v9.7.0"};
 
@@ -117,12 +113,14 @@ class ConcatenateNode : public NodeCRTP<ConcatenateNode> {
                                                        1,
                                                        &axis));
 
-        int64_t in_place_index = attributes.in_place_index.value();
-        _CUDNN_CHECK_CUDNN_ERROR(detail::set_attribute(concatenate_operation->get_backend_descriptor(),
-                                                       CUDNN_ATTR_OPERATION_CONCAT_INPLACE_INDEX,
-                                                       CUDNN_TYPE_INT64,
-                                                       1,
-                                                       &in_place_index));
+        if (attributes.in_place_index.has_value()) {
+            int64_t in_place_index = attributes.in_place_index.value();
+            _CUDNN_CHECK_CUDNN_ERROR(detail::set_attribute(concatenate_operation->get_backend_descriptor(),
+                                                           CUDNN_ATTR_OPERATION_CONCAT_INPLACE_INDEX,
+                                                           CUDNN_TYPE_INT64,
+                                                           1,
+                                                           &in_place_index));
+        }
 
         _CUDNN_CHECK_CUDNN_ERROR(detail::finalize(concatenate_operation->get_backend_descriptor()));
 
