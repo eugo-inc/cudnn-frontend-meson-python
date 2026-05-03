@@ -133,18 +133,20 @@ After editing each conflicted file to resolve, run `git add <file>` so git marks
 
 After resolving merge conflicts, Claude must run every item in this checklist, in order, and report pass/fail for each before suggesting `git push` or opening a PR. Do not skip steps. Do not declare the merge done until item (i) is complete.
 
-- [ ] **(a) Header list sync** — every `.h` under `include/` appears in `cudnn_frontend_native_header_files` at [meson.build:65](meson.build#L65):
+- [ ] **(a) Header list sync** — every `.h` under `include/` appears in `cudnn_frontend_native_header_files` at [meson.build:65](meson.build#L65). Use the helper script:
   ```bash
-  # Headers in tree but missing from meson.build (need to ADD):
-  comm -23 \
-    <(cd include && find . -name '*.h' | sed 's|^\./|include/|' | sort) \
-    <(grep -oE "'include/[^']+\.h'" meson.build | tr -d "'" | sort)
-  # Headers in meson.build but no longer in tree (need to REMOVE):
-  comm -13 \
-    <(cd include && find . -name '*.h' | sed 's|^\./|include/|' | sort) \
-    <(grep -oE "'include/[^']+\.h'" meson.build | tr -d "'" | sort)
+  ./.eugo/eugo_meson_sync_headers.py --check    # report drift, exit 1 if any (CI-friendly)
+  ./.eugo/eugo_meson_sync_headers.py            # apply: existing entries kept in their order, new ones appended at end of block, removed ones dropped in place
   ```
-  Both outputs must be empty. Edit `meson.build`'s `cudnn_frontend_native_header_files = files(...)` block: append additions (group new top-level subtrees like `experimental/`, `generated/` together for readability), delete removals.
+  After `--apply`, eyeball the diff: new entries land at the bottom of the `files(...)` block. If they belong inside an existing logical group (e.g. a new `node/foo.h` should sit with the other `node/*.h` entries; a new `experimental/foo.h` should sit with the other experimental headers), move them by hand. The script intentionally doesn't reshuffle to avoid producing massive diffs.
+
+  Manual fallback (if the script can't run):
+  ```bash
+  comm -23 <(cd include && find . -name '*.h' | sed 's|^\./|include/|' | sort) \
+           <(grep -oE "'include/[^']+\.h'" meson.build | tr -d "'" | sort)   # additions
+  comm -13 <(cd include && find . -name '*.h' | sed 's|^\./|include/|' | sort) \
+           <(grep -oE "'include/[^']+\.h'" meson.build | tr -d "'" | sort)   # removals
+  ```
 
   **Note**: this list is a *manifest*, not load-bearing for the build. The actual install happens via `install_subdir('include', ...)` at [meson.build:144](meson.build#L144), which copies the entire `include/` tree regardless. Drift here won't break `pip install`, but the manifest's whole point is to be an audit trail of what we ship — keep it accurate.
 
