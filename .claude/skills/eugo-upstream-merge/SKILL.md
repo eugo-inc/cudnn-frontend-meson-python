@@ -77,3 +77,11 @@ protomolecule/dependencies/python/wave_4/cuda_cudnn_frontend/meta.json
 meta.json pins by commit SHA. Only pin commits that are already pushed and
 reachable from origin/main - pinning a local or branch-only SHA breaks the
 protomolecule fetch. Push first, verify on GitHub, then update the pin.
+
+## Related skills
+
+- eugo-build-and-test - build/install commands, smoke test, protomolecule
+  consumer flow (run after resolving, for checklist items g/h).
+- eugo-meson-build-review - pre-commit cut of the CLAUDE.md 7 checklist for
+  build-file changes made during the merge.
+- eugo-rebuild - cheapest rebuild per diff; the post-merge pin-bump recipe.
