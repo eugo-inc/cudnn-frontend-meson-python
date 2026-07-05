@@ -22,10 +22,15 @@ downstream until the meta.json commit is bumped. The setup script also symlinks
 the installed <site-packages>/cudnn/include/* into EUGO_STANDARD_PATH/include
 so downstream builds (torch) find the headers.
 
-## Canonical branch: main (NOT eugo-main)
+## Canonical branch: eugo-main (org-wide convention as of 2026-07-05)
 
-A stale eugo-main branch exists with old divergent history (~137 commits
-behind). Ignore it. All fork work, PRs, and the protomolecule pin target main.
+eugo-main was realigned to the main tip on 2026-07-05 (the old divergent
+eugo-main is preserved at tag archive/eugo-main-stale-pre-2026-07-05).
+Per the org-wide convention, eugo-main is the canonical branch going
+forward; main mirrors it during the transition. NOTE: the protomolecule
+pin (python/wave_4/cuda_cudnn_frontend meta.json) still says branch: main -
+update it (and the GitHub default branch) when the transition completes;
+until then keep both branches in lockstep when pushing.
 
 ## Divergence inventory (fork vs upstream)
 
