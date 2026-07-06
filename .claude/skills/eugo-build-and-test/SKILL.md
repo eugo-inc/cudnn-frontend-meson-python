@@ -63,9 +63,9 @@ undefined symbol: nvrtc*` means `-lnvrtc` regressed; CLAUDE.md section 8).
 ## How eugo actually ships it (protomolecule)
 
 Package: `protomolecule/dependencies/python/wave_4/cuda_cudnn_frontend`.
-- `meta.json` pins THIS repo by `version.commit` (git_commit on branch main);
+- `meta.json` pins THIS repo by `version.commit` (git_commit on branch eugo-main);
   `build_flow: [mesonpy, meson]`. Nothing ships downstream until that pin is
-  bumped to a pushed main SHA (see eugo-rebuild).
+  bumped to a pushed eugo-main SHA (see eugo-rebuild).
 - `setup` runs `pip3 install "<name> @ <git pin>"` with
   `EUGO_PIP_COMPILABLE_PACKAGE_OPTIONS` + `EUGO_PIP_TARGET_FLAG` +
   `EUGO_MESONPY_COMMON_OPTIONS` (release, gnu++ std, cmake_prefix_path,

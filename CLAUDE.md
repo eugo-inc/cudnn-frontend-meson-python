@@ -79,7 +79,7 @@ match). Watch
 ```bash
 git remote -v                       # expect origin (eugo-inc) + upstream (NVIDIA)
 git fetch upstream
-git checkout main && git pull
+git checkout eugo-main && git pull
 git checkout -b merge/upstream-$(date +%Y-%m-%d)
 git merge upstream/main             # merge, NEVER rebase
 git status --short | grep -E '^(UU|AA|DD|AU|UA|DU|UD)'   # true conflicts only; leave plain M/A/D alone

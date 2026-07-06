@@ -1,6 +1,6 @@
 ---
 name: eugo-upstream-merge
-description: Merge upstream NVIDIA/cudnn-frontend into the Eugo fork eugo-inc/cudnn-frontend-meson-python (canonical branch main). Covers the fork's meson-python divergence inventory, the merge recipe, the CLAUDE.md section 7 checklist, and the protomolecule commit-pin bump. Activates on "merge upstream", "upstream sync", "cudnn-frontend sync", "catch up to NVIDIA/cudnn-frontend", "bump cudnn frontend".
+description: Merge upstream NVIDIA/cudnn-frontend into the Eugo fork eugo-inc/cudnn-frontend-meson-python (canonical branch eugo-main). Covers the fork's meson-python divergence inventory, the merge recipe, the CLAUDE.md section 7 checklist, and the protomolecule commit-pin bump. Activates on "merge upstream", "upstream sync", "cudnn-frontend sync", "catch up to NVIDIA/cudnn-frontend", "bump cudnn frontend".
 ---
 
 # Upstream merge: eugo-inc/cudnn-frontend-meson-python
@@ -15,9 +15,9 @@ cuda-cudnn-frontend, with all deps (cudart, cuDNN, nlohmann_json, dlpack,
 pybind11) taken from the system instead of FetchContent/vendored copies.
 
 Consumer: protomolecule dependencies/python/wave_4/cuda_cudnn_frontend.
-Its meta.json pins this repo by git_commit on branch main (version.kind =
+Its meta.json pins this repo by git_commit on branch eugo-main (version.kind =
 "git_commit"). Because the pin is a commit, merging upstream here and adopting
-it in protomolecule are DECOUPLED steps: a merge landed on main changes nothing
+it in protomolecule are DECOUPLED steps: a merge landed on eugo-main changes nothing
 downstream until the meta.json commit is bumped. The setup script also symlinks
 the installed <site-packages>/cudnn/include/* into EUGO_STANDARD_PATH/include
 so downstream builds (torch) find the headers.
@@ -26,11 +26,11 @@ so downstream builds (torch) find the headers.
 
 eugo-main was realigned to the main tip on 2026-07-05 (the old divergent
 eugo-main is preserved at tag archive/eugo-main-stale-pre-2026-07-05).
-Per the org-wide convention, eugo-main is the canonical branch going
-forward; main mirrors it during the transition. NOTE: the protomolecule
-pin (python/wave_4/cuda_cudnn_frontend meta.json) still says branch: main -
-update it (and the GitHub default branch) when the transition completes;
-until then keep both branches in lockstep when pushing.
+Per the org-wide convention, eugo-main is the canonical branch. The
+transition is complete: the protomolecule pin
+(python/wave_4/cuda_cudnn_frontend meta.json), the GitHub default
+branch, and origin HEAD all point at eugo-main, and the old main
+mirror branch has been deleted.
 
 ## Divergence inventory (fork vs upstream)
 
@@ -54,7 +54,7 @@ until then keep both branches in lockstep when pushing.
 
 1. git remote add upstream https://github.com/NVIDIA/cudnn-frontend.git
    (if missing); git fetch upstream.
-2. Branch off main. History uses <user>/feat/MM-DD-YY-merge-upstream
+2. Branch off eugo-main. History uses <user>/feat/MM-DD-YY-merge-upstream
    (e.g. bwl1289/feat/05-02-26-merge-upstream); CLAUDE.md 6 suggests
    merge/upstream-YYYY-MM-DD. Either works.
 3. git merge upstream/main - MERGE, never rebase (preserves upstream history
@@ -67,20 +67,20 @@ until then keep both branches in lockstep when pushing.
    source-list comm check (load-bearing), the version-regex check,
    pyproject invariants, symlink check, pip install -v . and pytest
    test/python.
-6. PR to main. Use the MERGE-COMMIT method ONLY - never squash: squashing
+6. PR to eugo-main. Use the MERGE-COMMIT method ONLY - never squash: squashing
    destroys the upstream merge parent and breaks every future sync.
 
 ## Post-merge adoption (protomolecule)
 
-After the PR merges to main, bump the pin in
+After the PR merges to eugo-main, bump the pin in
 protomolecule/dependencies/python/wave_4/cuda_cudnn_frontend/meta.json
-(version.commit) to the new main tip, then rebuild that wave to validate
+(version.commit) to the new eugo-main tip, then rebuild that wave to validate
 (torch in the same wave consumes the installed headers).
 
 ## Push-before-pin warning
 
 meta.json pins by commit SHA. Only pin commits that are already pushed and
-reachable from origin/main - pinning a local or branch-only SHA breaks the
+reachable from origin/eugo-main - pinning a local or branch-only SHA breaks the
 protomolecule fetch. Push first, verify on GitHub, then update the pin.
 
 ## Related skills

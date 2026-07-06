@@ -34,14 +34,14 @@ After any full build, run the smoke test from the eugo-build-and-test skill
 ## When protomolecule must be rebuilt / pin-bumped
 
 protomolecule's `dependencies/python/wave_4/cuda_cudnn_frontend/meta.json`
-pins this repo by `version.commit` on branch main. Consequences:
+pins this repo by `version.commit` on branch eugo-main. Consequences:
 
-- Landing a change on main changes NOTHING downstream until the pin is bumped.
-- Bump when the change should ship: set `version.commit` to the new main tip,
+- Landing a change on eugo-main changes NOTHING downstream until the pin is bumped.
+- Bump when the change should ship: set `version.commit` to the new eugo-main tip,
   then rebuild that protomolecule wave (torch consumes the installed headers
   via `CUDNN_FRONTEND_INCLUDE_PATH`, so a header-affecting bump must be
   validated by a torch build, not just this package's install).
-- PUSH BEFORE PIN: only pin SHAs already reachable from origin/main - a
+- PUSH BEFORE PIN: only pin SHAs already reachable from origin/eugo-main - a
   local-only SHA breaks the protomolecule fetch.
 
 ## Related
